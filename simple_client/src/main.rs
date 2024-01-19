@@ -41,6 +41,7 @@ struct TradeLog {
 
 //to make connetion with websocket, create json and providing output
 async fn getting_data(time: u64) {
+    
     let url = "wss://stream.binance.com:9443/ws/btcusdt@trade";
     let (mut ws_stream, _) = connect_async(url).await.expect("failed to connect");
 
@@ -121,6 +122,7 @@ fn reading_data(file_path : &str) {
 
 #[tokio::main]
 async fn main() {
+
     let matches = App::new("Birthday Greeting")
     .version("1.0")
     .author("Your Name")
@@ -145,12 +147,14 @@ async fn main() {
     )
     .get_matches();
 
+
     let mode_input = matches.value_of("mode");
     let mut times = matches.value_of("times");
     let mut time :u64 = 0; 
 
+    
+    //matching mode
     if let Some(mode) = mode_input {
-        //matching mode
 
         //for cache mode
         if mode == "cache" {
