@@ -109,7 +109,7 @@ pub async fn client_getting_data(id:usize , time: u64, sender:sync::mpsc::Sender
 
     tokio::join!(make_json_async,make_output_file_async);
 
-    println!("Cache complete. The average USD price of BTC calculated by client {} is: {}", id, average_price);
+    println!("client {} :Cache complete. The average USD price of BTC is {}", id, average_price);
 
     //converting into array of bytes for authentication
    let avg_price_bytes = average_price.to_le_bytes();
@@ -121,6 +121,7 @@ pub async fn client_getting_data(id:usize , time: u64, sender:sync::mpsc::Sender
    let data = (id,avg_price_bytes, signature);
 
     sender.send(data).await.expect("failed to send avg price");
+    println!("client {} : Data is signed sending to the aggregator", id);
 
 }
 
@@ -142,7 +143,7 @@ pub async fn aggregator(mut receiver: sync::mpsc::Receiver<(usize,[u8; 8], Vec<u
             //verifying signature with senders public key
             if pub_key.verify(PaddingScheme::PKCS1v15Sign { hash: None }, &avg_price_bytes, &signature)
             .is_ok() {
-                println!("client {} : Authentication successful!!",id);
+                println!("Agrregator : client {} Signature verified!!",id);
                 let avg_price = f64::from_le_bytes(avg_price_bytes);
                 rec_avg_prices.push(avg_price);
             }else {
