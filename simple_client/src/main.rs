@@ -21,7 +21,6 @@ use std::fs::{File, OpenOptions};
 
 
 
-
 //structure of trade log
 #[derive(Serialize, Deserialize)]
 struct TradeLog {
@@ -119,6 +118,7 @@ fn reading_data(file_path : &str) {
 
 }
 
+
 #[tokio::main]
 async fn main() {
     let matches = App::new("Birthday Greeting")
@@ -144,7 +144,6 @@ async fn main() {
             .takes_value(true),
     )
     .get_matches();
-
 
     let mode_input = matches.value_of("mode");
     let mut times = matches.value_of("times");
@@ -182,8 +181,5 @@ async fn main() {
     }else {
         //for no args
         println!("No arguments passed, so you got nothing", );
-    }
-
-
-        
+    }   
 }
