@@ -10,180 +10,138 @@ print "Cache complete. The average USD price of BTC is: XXX"
 Save both the result of the aggregate and the data points used to create the aggregate to a file.
 The read mode should just read from the file and print the values to the terminal. */
 
+/*
+2. Simulated distributed client
+Extend the solution to Q1 by instantiating 5 client processes and one aggregator process.
+a. All client processes start at the same tick of the time, say 10:01:01 AM.
+b. Client process read values from the websocket for 10 seconds and computes the average and
+sends it to the aggregator process.
+c. Aggregator process waits for the average values from all the 5 processes. Upon getting all the
+values it computes yet another average and displays on the screen.
+*/
+
+/*
+3. Using signatures
+Extend the solution to Q2 where the clients send the signed messages to the aggregator. And the
+aggregator validates the signatures and then computes the average of averages. Any signature
+scheme is fine. Set up the premise such that all the processes knows the public keys of all other
+processes before hand.
+
+used - rsa digital signature
+*/
+
 use clap::{App, Arg};
-use tokio_tungstenite::{connect_async, WebSocketStream};
+use lib::{aggregator, client_getting_data, reading_data};
+use rand::rngs::OsRng;
+use rsa::{RSAPrivateKey, RSAPublicKey};
+use std::sync::Arc;
 use tokio::sync;
-use tokio::io::{self, AsyncBufReadExt};
-use futures_util::StreamExt;
-use serde_derive::{Serialize,Deserialize};
-use std::io::{Write,BufRead, BufReader};
-use std::fs::{File, OpenOptions};
-
-
-
-//structure of trade log
-#[derive(Serialize, Deserialize)]
-struct TradeLog {
-    e: String,
-    E: u64,
-    s: String,
-    t: u64,
-    p: String,
-    q: String,
-    b: u64,
-    a: u64,
-    T: u64,
-    m: bool,
-    M: bool,
-}
-
-
-
-//to make connetion with websocket, create json and providing output
-async fn getting_data(time: u64) {
-    
-    let url = "wss://stream.binance.com:9443/ws/btcusdt@trade";
-    let (mut ws_stream, _) = connect_async(url).await.expect("failed to connect");
-
-    let (_, mut read) = ws_stream.split();
-
-    //vec to store data
-    let mut received_data = Vec::new();
-
-    let start_time = std::time::Instant::now();
-    while start_time.elapsed().as_secs() < time {
-        match read.next().await {
-            Some(Ok(msg)) => {
-                if let tokio_tungstenite::tungstenite::Message::Text(text) = msg {
-                    //println!("Received a message: {}", text);
-                    received_data.push(text);
-                }
-            }
-            Some(Err(e)) => eprintln!("Error receiving message: {}", e),
-            None => {
-                println!("Connection closed");
-                break;
-            }
-        }
-    }
-
-    // Parse and convert received JSON strings into TradeLog structs
-    let trade_logs: Vec<TradeLog> = received_data.iter()
-        .filter_map(|msg| serde_json::from_str(msg).ok())
-        .collect();
-
-    //collect all p values in vector
-    let p_values: Vec<f64> = trade_logs.iter().map(|log| log.p.parse::<f64>().unwrap_or(0.0)).collect();
-    let total_price: f64 = p_values.iter().sum();
-
-    //calculating avg price
-    let average_price = if !trade_logs.is_empty() {
-        total_price / trade_logs.len() as f64
-    } else {
-        0.0
-    };
-
-    //serializing to json P
-    let make_json_async = tokio::spawn(async move{
-        let json_data = serde_json::to_string_pretty(&trade_logs).expect("Failed to serialize to JSON");
-        std::fs::write("btc.json", json_data).expect("Failed to write to file");
-    });
-
-    let make_output_file_async = tokio::spawn(async move {
-        let mut file = OpenOptions::new().write(true).create(true).truncate(true).open("output.txt").expect("Failed to open or create file");
-
-        // Write p values and average price to the file
-        writeln!(file, "p values: {:?}", p_values).expect("Failed to write p values to file");
-        writeln!(file, "avg P: {}", average_price).expect("Failed to write average price to file");
-    });
-
-    tokio::join!(make_json_async,make_output_file_async);
-
-    println!("Cache complete. The average USD price of BTC is: {}", average_price);
-
-}
-
-
-fn reading_data(file_path : &str) {
-
-    let file = File::open(file_path).expect("Failed to open file");
-    let reader = BufReader::new(file);
-
-    for line in reader.lines() {
-        if let Ok(line_content) = line {
-            println!("{}", line_content);
-        } else {
-            eprintln!("Error reading line from file");
-        }
-    }
-
-}
 
 
 #[tokio::main]
 async fn main() {
 
-    let matches = App::new("Birthday Greeting")
-    .version("1.0")
-    .author("Your Name")
-    .about("reading args")
-    .arg(
-        Arg::with_name("mode")
-            .short("mode")
-            .long("mode")
-            .value_name("MODE")
-            .help("mode of task")
-            .required(false)
-            .takes_value(true),
-    )
-    .arg(
-        Arg::with_name("times")
-            .short("times")
-            .long("times")
-            .value_name("TIMES")
-            .help("Takes time seconds")
-            .required(false)
-            .takes_value(true),
-    )
+    let matches = App::new("simple client")
+        .version("1.0")
+        .author("Your Name")
+        .about("reading args")
+        .arg(
+            Arg::with_name("mode")
+                .short("mode")
+                .long("mode")
+                .value_name("MODE")
+                .help("mode of task")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("times")
+                .short("times")
+                .long("times")
+                .value_name("TIMES")
+                .help("Takes time seconds")
+                .required(false)
+                .takes_value(true),
+        )
     .get_matches();
 
 
+    //parsing inputs
     let mode_input = matches.value_of("mode");
-    let mut times = matches.value_of("times");
-    let mut time :u64 = 0; 
+    let times = matches.value_of("times");
+    let mut time: u64 = 0;
 
-    
+    //creating public and private key
+    let mut rng = OsRng;
+    let bits = 2048;
+    let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    let public_key = RSAPublicKey::from(&private_key);
+    let private_key = Arc::new(private_key);
+
+
     //matching mode
     if let Some(mode) = mode_input {
 
         //for cache mode
         if mode == "cache" {
+
+            let (tx, rx) = sync::mpsc::channel::<(usize, [u8; 8], Vec<u8>)>(5);
+
             //matching time arg
             if let Some(val) = times {
+                
                 time = val.parse::<u64>().unwrap();
+                println!("caching data from 5 clients for {} seconds", time);
 
-                println!("mode : {}, time : {}",mode, time );
-                getting_data(time).await;
-            }else {
-                panic!("Have to give time with cache ");
+                // spawning 5 client
+                let handles = (1..=5)
+                    .map(|id| {
+                        let tx = tx.clone();
+                        let pri_key = Arc::clone(&private_key);
+                        println!("client {}: collecting data...", id);
+                        tokio::spawn(client_getting_data(id, time, tx, pri_key))
+                    })
+                    .collect::<Vec<_>>();
+
+                // spawning aggregator process
+                let pub_key = Arc::new(public_key.clone());
+                let aggregator_handle = tokio::spawn(aggregator(rx, pub_key));
+
+                for handle in handles {
+                    handle.await.expect("Failed to join client task");
+                }
+
+                // Drop the sender side to close the channel and signal to the aggregator
+                drop(tx);
+
+                // Wait for aggregator process to finish
+                aggregator_handle
+                    .await
+                    .expect("Failed to join aggregator task");
+            } else {
+                panic!("Have to give time with cache");
             }
 
-        // for read mode 
-        }else if mode == "read" {
+        // for read mode
+        } else if mode == "read" {
             //matching time arg
             if let Some(val) = times {
                 panic!("wrong arguments given with mode=read")
-            }else {
-                let file_path = "output.txt";
-                reading_data(file_path);
+            } else {
+                for x in 1..=5 {
+                    let file_path = format!("output{}.txt", x);
+                    println!("reading file : {}", x);
+                    reading_data(&file_path);
+                    println!(" ");
+                }
             }
-        
+
         //for unknown args
-        }else {
+        } else {
             panic!("Unknown arguments have been passed");
         }
-    }else {
+    } else {
         //for no args
-        println!("No arguments passed, so you got nothing", );
-    }   
+        println!("No arguments passed, so you got nothing",);
+    }
 }
