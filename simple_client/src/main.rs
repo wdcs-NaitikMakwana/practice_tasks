@@ -86,11 +86,11 @@ async fn getting_data(time: u64) {
     //serializing to json P
     let make_json_async = tokio::spawn(async move{
         let json_data = serde_json::to_string_pretty(&trade_logs).expect("Failed to serialize to JSON");
-        std::fs::write("C://codezeros_workspace//practice_tasks//simple_client//btc.json", json_data).expect("Failed to write to file");
+        std::fs::write("btc.json", json_data).expect("Failed to write to file");
     });
 
     let make_output_file_async = tokio::spawn(async move {
-        let mut file = OpenOptions::new().write(true).create(true).truncate(true).open("C://codezeros_workspace//practice_tasks//simple_client//output.txt").expect("Failed to open or create file");
+        let mut file = OpenOptions::new().write(true).create(true).truncate(true).open("output.txt").expect("Failed to open or create file");
 
         // Write p values and average price to the file
         writeln!(file, "p values: {:?}", p_values).expect("Failed to write p values to file");
@@ -174,7 +174,7 @@ async fn main() {
             if let Some(val) = times {
                 panic!("wrong arguments given with mode=read")
             }else {
-                let file_path = "C://codezeros_workspace//practice_tasks//simple_client//output.txt";
+                let file_path = "output.txt";
                 reading_data(file_path);
             }
         
