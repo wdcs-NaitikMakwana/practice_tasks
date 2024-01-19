@@ -1,0 +1,10 @@
+# Ignore all files except those with the following extensions
+
+!*.json
+!*.txt
+!*.rs
+!*.toml
+!*.lock
+
+*/target
+# Ignore all other files
