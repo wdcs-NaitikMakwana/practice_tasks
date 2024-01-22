@@ -1,11 +1,14 @@
 use tokio::sync;
 use tokio::io;
+use tokio::net::{TcpStream, TcpListener};
+use tokio::io::{AsyncWriteExt,AsyncReadExt};
 use tokio_tungstenite::{connect_async, WebSocketStream};
 use futures_util::StreamExt;
 use serde_derive::{Serialize,Deserialize};
 use std::io::{Write,BufRead, BufReader};
 use std::fs::{File, OpenOptions};
 use std::sync::Arc;
+use bincode;
 use crypto::{sha2::Sha256, digest::Digest};
 use rand::rngs::OsRng;
 use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey,PaddingScheme};
@@ -49,7 +52,7 @@ pub fn reading_data(file_path : &str) {
 
 
 //client function
-pub async fn client_getting_data(id:usize , time: u64, sender:sync::mpsc::Sender<(usize,[u8; 8], Vec<u8>)>, private_key: Arc<RSAPrivateKey>) 
+pub async fn client_getting_data(id:usize , time: u64, private_key: Arc<RSAPrivateKey>) 
 {
 
     let url = "wss://stream.binance.com:9443/ws/btcusdt@trade";
@@ -116,13 +119,13 @@ pub async fn client_getting_data(id:usize , time: u64, sender:sync::mpsc::Sender
 
     //signing the data with sender's private key
    let signature = private_key.sign(PaddingScheme::PKCS1v15Sign {hash: None }, &avg_price_bytes).expect("Failed to sign data");
+   
+    //bincode is a crate for encoding and decoding using a tiny binary serialization 
+    let data = bincode::serialize(&(id, avg_price_bytes, signature)).expect("Failed to serialize data");
 
-    //Sending data as well as signature as a tuple
-   let data = (id,avg_price_bytes, signature);
-
-    sender.send(data).await.expect("failed to send avg price");
-    println!("client {} : Data is signed sending to the aggregator", id);
-
+    //connecting to stream and writing the data
+    let mut stream = TcpStream::connect("127.0.0.1:8080").await.expect("Could not connect to aggregator");
+    stream.write_all(&data).await.expect("Failed to write data");
 }
 
 
@@ -132,24 +135,34 @@ pub async fn client_getting_data(id:usize , time: u64, sender:sync::mpsc::Sender
 
 //aggregator function
 
-pub async fn aggregator(mut receiver: sync::mpsc::Receiver<(usize,[u8; 8], Vec<u8>)>, public_key: Arc<RSAPublicKey>) {
+pub async fn aggregator(public_key: Arc<RSAPublicKey>) {
+
+    //tcp listner which binds the address to read the data
+    let listener = TcpListener::bind("127.0.0.1:8080").await.expect("Could not bind to address");
 
     let mut rec_avg_prices = Vec::new();
     let pub_key = Arc::clone(&public_key);
 
     for _  in 0..5 {
-        if let Some((id,avg_price_bytes,signature)) = receiver.recv().await {
+        
+        //accepting connection on the address
+        let (mut socket, _) = listener.accept().await.expect("Failed to accept connection");
 
-            //verifying signature with senders public key
-            if pub_key.verify(PaddingScheme::PKCS1v15Sign { hash: None }, &avg_price_bytes, &signature)
-            .is_ok() {
-                println!("Agrregator : client {} Signature verified!!",id);
-                let avg_price = f64::from_le_bytes(avg_price_bytes);
-                rec_avg_prices.push(avg_price);
-            }else {
-                panic!("Authentication of client {} fail. keys do not match", id);
-            }
+        //creating buffer to store data
+        let mut buffer = vec![0; 1024];
+        socket.read(&mut buffer).await.expect("Failed to read data");
 
+        // Deserialize the bincode data
+        let (id, avg_price_bytes, signature): (usize, [u8; 8], Vec<u8>) = bincode::deserialize(&buffer).expect("Failed to deserialize data");
+
+        //verifying signature with senders public key
+        if pub_key.verify(PaddingScheme::PKCS1v15Sign { hash: None }, &avg_price_bytes, &signature)
+        .is_ok() {
+            println!("Agrregator : client {} Signature verified!!",id);
+            let avg_price = f64::from_le_bytes(avg_price_bytes);
+            rec_avg_prices.push(avg_price);
+        }else {
+            panic!("Authentication of client {} fail. keys do not match", id);
         }
     }
 

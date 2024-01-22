@@ -85,8 +85,6 @@ async fn main() {
         //for cache mode
         if mode == "cache" {
 
-            let (tx, rx) = sync::mpsc::channel::<(usize, [u8; 8], Vec<u8>)>(5);
-
             //matching time arg
             if let Some(val) = times {
                 
@@ -96,23 +94,19 @@ async fn main() {
                 // spawning 5 client
                 let handles = (1..=5)
                     .map(|id| {
-                        let tx = tx.clone();
                         let pri_key = Arc::clone(&private_key);
                         println!("client {}: collecting data...", id);
-                        tokio::spawn(client_getting_data(id, time, tx, pri_key))
+                        tokio::spawn(client_getting_data(id, time,pri_key))
                     })
                     .collect::<Vec<_>>();
 
                 // spawning aggregator process
                 let pub_key = Arc::new(public_key.clone());
-                let aggregator_handle = tokio::spawn(aggregator(rx, pub_key));
+                let aggregator_handle = tokio::spawn(aggregator(pub_key));
 
                 for handle in handles {
                     handle.await.expect("Failed to join client task");
                 }
-
-                // Drop the sender side to close the channel and signal to the aggregator
-                drop(tx);
 
                 // Wait for aggregator process to finish
                 aggregator_handle
