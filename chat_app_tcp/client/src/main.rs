@@ -13,12 +13,13 @@ async fn main() {
 
     // used Arc to share ownership of the name between main and the spawned tasks
     let shared_name = Arc::new(name.to_owned());
-    println!("Welcome to the chat {:?}", &shared_name );
+    println!("Welcome to the chat!!");
 
     //connecting to server stream
     let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
-    let (reader, writer) = tokio::io::split(stream);
+    let (reader, mut writer) = tokio::io::split(stream);
 
+    writer.write_all(format!("{} has joined the chat \n", name).as_bytes()).await.expect("failed to send joining message");
     
     //reading and writing messages concurrently by spawning 
     let reader_task = tokio::spawn({
