@@ -6,5 +6,5 @@
 !*.toml
 !*.lock
 
-*/target
+target
 # Ignore all other files
