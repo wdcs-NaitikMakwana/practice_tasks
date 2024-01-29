@@ -11,7 +11,7 @@ async fn main() {
     std::io::stdin().read_line(&mut name).expect("Failed to read from stdin");
     let name = name.trim();
 
-    // Used Arc to share ownership of the name between main and the spawned tasks
+    // used Arc to share ownership of the name between main and the spawned tasks
     let shared_name = Arc::new(name.to_owned());
     println!("Welcome to the chat {:?}", &shared_name );
 
@@ -34,6 +34,7 @@ async fn main() {
         }
     });
 
+    //joining spawned task before main loop ends
     tokio::try_join!(reader_task, writer_task).expect("Failed to run tasks");
 }
 
@@ -70,6 +71,8 @@ async fn write_messages(mut writer: tokio::io::WriteHalf<TcpStream>, name: &Arc<
         // formatting message and writing on stream
         let formatted_message = format!("{}: {}", name, message);
         writer.write_all(formatted_message.as_bytes()).await.expect("Failed to write to socket");
+        
+        //the flush method helps to ensure that any buffered data is sent immediately.
         writer.flush().await.expect("Failed to flush socket");
     }
 }
