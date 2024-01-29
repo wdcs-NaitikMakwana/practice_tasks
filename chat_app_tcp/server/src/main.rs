@@ -41,7 +41,7 @@ async fn handle_client(mut socket: TcpStream, tx: broadcast::Sender<String>, mut
                     // for broadcasting the received message to all clients
                     let message = String::from_utf8_lossy(&buffer[..bytes_read]).to_string();
                     //logging messages on server side
-                    println!("chat log : {}",message.clone() );
+                    println!("Received message from {}",message.clone() );
                     tx.send(message).unwrap();
                 }
             }
