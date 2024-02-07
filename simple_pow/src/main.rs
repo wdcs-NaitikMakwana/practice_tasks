@@ -6,7 +6,6 @@ use hex;
 //structure of the block
 #[derive(Debug)]
 struct Block {
-
     block_id : u64,
     data : String,
     prev_hash : String,
@@ -14,6 +13,7 @@ struct Block {
     nonce : u64,
     block_hash : String,
 }
+
 
 //associated methods for Block
 impl Block {
@@ -28,27 +28,25 @@ impl Block {
             nonce : 0,
             block_hash : String::new(),
         };
-
+        //calculating block hash
         block.block_hash = block.calc_hash();
         block
     }
 
     //for calculating hash of block
     fn calc_hash(&self) -> String {
-
+        //collecting data to be hashed
         let input_data = self.data.clone() + &(self.prev_hash) + &(self.nonce.to_string());
-
         let mut hasher =  Sha256::new();
         hasher.update(input_data.clone());
         let hashed_result = hasher.finalize();
+        //converting hashed bytes to hex form
         let hash = hex::encode(&hashed_result);
         hash
     }
-    
 
     //for mining new block
     fn mine_block(&mut self, difficulty : String) {
-        
         //setting difficulty
         while self.block_hash[0..difficulty.len()] != difficulty {
             self.nonce += 1;
@@ -58,6 +56,7 @@ impl Block {
         println!("Block {} mined: {}",self.block_id, self.block_hash);
     }
 }
+
 
 //structure of the chain
 #[derive(Debug)]
@@ -73,7 +72,6 @@ impl Blockchain {
     fn new() -> Blockchain {
         let mut new_chain : Vec<Block> = Vec::new();
         new_chain.push(Block::create_block(0, String::from("Genesis block"),String::from("0")));
-
         Blockchain { chain : new_chain }
     }
 
@@ -81,27 +79,28 @@ impl Blockchain {
     fn add_new_block(&mut self, data : String, difficulty : String) {
         let block_id = (self.chain.last().unwrap().block_id) + 1;
         let prev_hash = self.chain.last().unwrap().block_hash.clone();
-
+        //creating block
         let mut block = Block::create_block(block_id, data, prev_hash);
+        //mining block
         block.mine_block(difficulty);
+        //adding to blockchain
         self.chain.push(block);
-
     }
 }
 
+
 fn main() {
 
-  let mut chain_1 = Blockchain::new();
+    //initiating chain
+    let mut chain_1 = Blockchain::new();
 
-  //pass data and difficulty to add block
-  chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
+    //pass data and difficulty to add block
+    chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
+    chain_1.add_new_block(String::from("some set of transactions"), String::from("00000"));
+    chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
 
-  chain_1.add_new_block(String::from("some set of transactions"), String::from("00000"));
-
-  chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
-
-  for block in chain_1.chain {
-    println!("{:?}", block );
-  }
+    for block in chain_1.chain {
+        println!("{:?}", block );
+    }
 
 }
