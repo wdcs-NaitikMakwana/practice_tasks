@@ -30,7 +30,7 @@ impl Block {
         };
         //calculating block hash
         block.block_hash = block.calc_hash();
-        block
+        return block;
     }
 
     //for calculating hash of block
@@ -42,7 +42,7 @@ impl Block {
         let hashed_result = hasher.finalize();
         //converting hashed bytes to hex form
         let hash = hex::encode(&hashed_result);
-        hash
+        return hash;
     }
 
     //for mining new block
@@ -68,11 +68,12 @@ struct Blockchain {
 //associated method of blockchain
 impl Blockchain {
 
-    //initiating chain
+    //initiating chain and adding genesis block to the chain
     fn new() -> Blockchain {
         let mut new_chain : Vec<Block> = Vec::new();
         new_chain.push(Block::create_block(0, String::from("Genesis block"),String::from("0")));
-        Blockchain { chain : new_chain }
+        let new_blockchain  = Blockchain { chain : new_chain };
+        return new_blockchain;
     }
 
     //for adding new block
@@ -102,5 +103,4 @@ fn main() {
     for block in chain_1.chain {
         println!("{:?}", block );
     }
-
 }
