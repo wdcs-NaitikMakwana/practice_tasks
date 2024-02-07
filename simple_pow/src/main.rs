@@ -18,7 +18,7 @@ struct Block {
 //associated methods for Block
 impl Block {
 
-    //block constructor
+    //for creating block
     fn create_block(block_id:u64, data: String, prev_hash : String) -> Block {
         let mut block = Block {
             block_id : block_id,
@@ -33,7 +33,7 @@ impl Block {
         block
     }
 
-    //for calculating hash
+    //for calculating hash of block
     fn calc_hash(&self) -> String {
 
         let input_data = self.data.clone() + &(self.prev_hash) + &(self.nonce.to_string());
@@ -72,7 +72,7 @@ impl Blockchain {
     //initiating chain
     fn new() -> Blockchain {
         let mut new_chain : Vec<Block> = Vec::new();
-        new_chain.push(Block::create_block(1, String::from("Genesis block"),String::from("0")));
+        new_chain.push(Block::create_block(0, String::from("Genesis block"),String::from("0")));
 
         Blockchain { chain : new_chain }
     }
@@ -93,9 +93,12 @@ fn main() {
 
   let mut chain_1 = Blockchain::new();
 
-  chain_1.add_new_block(String::from("transaction 1 : all txn details"), String::from("0000"));
+  //pass data and difficulty to add block
+  chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
 
-  chain_1.add_new_block(String::from("transaction 2 : all txn details"), String::from("00000"));
+  chain_1.add_new_block(String::from("some set of transactions"), String::from("00000"));
+
+  chain_1.add_new_block(String::from("some set of transactions"), String::from("0000"));
 
   for block in chain_1.chain {
     println!("{:?}", block );
